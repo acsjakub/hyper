@@ -52,5 +52,4 @@ mod test {
         let segment = Segment::from_line(segment_line.clone(), 3);
         assert_eq!(format!("{}", segment), segment_line);
     }
-
 }
