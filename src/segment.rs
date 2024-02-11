@@ -1,5 +1,7 @@
 use std::fmt;
+use std::num::ParseIntError;
 
+#[derive(Debug, PartialEq)]
 pub struct Segment {
     id: u64,
     name: String,
@@ -8,16 +10,31 @@ pub struct Segment {
     flags: String,
 }
 
+#[derive(Debug, PartialEq)]
+pub struct ParseError;
+
+impl ParseError {
+    pub fn from_parseint(err: ParseIntError) -> Self {
+        Self
+    }
+}
+
 impl Segment {
-    pub fn from_line(line: String, id: u64) -> Self {
-        let mut it = line.split(' ');
-        Self {
+
+    fn address_from_str(addr: &str) -> Result<u64, ParseError> {
+        Ok(u64::from_str_radix(addr, 16).map_err(ParseError::from_parseint)?)
+    }
+
+    pub fn from_line(line: String, id: u64) -> Result<Self, ParseError> {
+        let fields: Vec<&str> = line.split(' ').collect();
+
+        Ok(Self {
             id: id,
-            name: it.next().unwrap().into(),
-            address: u64::from_str_radix(it.next().unwrap(), 16).unwrap(),
-            len: it.next().unwrap().parse::<u64>().unwrap() as usize,
-            flags: it.next().unwrap().into(),
-        }
+            name: String::from(fields[0]),
+            address: Self::address_from_str(fields[1])?,
+            len: fields[2].parse::<u64>().unwrap() as usize,
+            flags: String::from(fields[3]),
+        })
     }
 }
 
@@ -36,9 +53,16 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_segment_from_line() {
+    fn test_segment_display() {
         let segment_line = String::from(".seg 1337dead 4000 RW");
-        let segment = Segment::from_line(segment_line, 3);
+        let segment = Segment::from_line(segment_line.clone(), 3).unwrap();
+        assert_eq!(format!("{}", segment), segment_line);
+    }
+
+    #[test]
+    fn test_valid_line() {
+        let segment_line = String::from(".seg 1337dead 4000 RW");
+        let segment = Segment::from_line(segment_line, 3).unwrap();
         assert_eq!(segment.id, 3);
         assert_eq!(segment.name, ".seg");
         assert_eq!(segment.address, 0x1337dead);
@@ -46,10 +70,17 @@ mod test {
         assert_eq!(segment.flags, "RW");
     }
 
+
     #[test]
-    fn test_segment_display() {
-        let segment_line = String::from(".seg 1337dead 4000 RW");
-        let segment = Segment::from_line(segment_line.clone(), 3);
-        assert_eq!(format!("{}", segment), segment_line);
+    fn test_short_line() {
+        let segment_line = String::from(".seg 14325 4000");
+        let segment = Segment::from_line(segment_line, 1);
+    }
+
+    #[test]
+    fn test_invalid_address_line() {
+        let segment_line = String::from(".seg g14325 4000 RD");
+        let segment = Segment::from_line(segment_line, 1);
+        assert_eq!(segment, Err(ParseError));
     }
 }

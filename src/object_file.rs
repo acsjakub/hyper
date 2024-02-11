@@ -43,7 +43,7 @@ impl ObjectFile {
         for i in 0..nums[0] {
             line = String::new();
             reader.read_line(&mut line).unwrap();
-            segments.push(Segment::from_line(line, i));
+            segments.push(Segment::from_line(line, i).unwrap());
         }
 
         for i in 0..nums[1] {
