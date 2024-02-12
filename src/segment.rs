@@ -27,14 +27,17 @@ impl Segment {
 
     pub fn from_line(line: String, id: u64) -> Result<Self, ParseError> {
         let fields: Vec<&str> = line.split(' ').collect();
+        match fields.len() {
+            4.. =>  Ok(Self {
+                        id: id,
+                        name: String::from(fields[0]),
+                        address: Self::address_from_str(fields[1])?,
+                        len: fields[2].parse::<u64>().map_err(ParseError::from_parseint)? as usize,
+                        flags: String::from(fields[3]),
+            }),
+            _ => Err(ParseError)
+        }
 
-        Ok(Self {
-            id: id,
-            name: String::from(fields[0]),
-            address: Self::address_from_str(fields[1])?,
-            len: fields[2].parse::<u64>().unwrap() as usize,
-            flags: String::from(fields[3]),
-        })
     }
 }
 
