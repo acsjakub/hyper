@@ -109,27 +109,27 @@ mod tests {
     use super::*;
     use std::io::Write;
 
+    fn create_object_file(content: &str, filename: &str) -> Result<ObjectFile, LoadError> {
+        let mut output = File::create(filename).unwrap();
+        write!(output, "{}", content).unwrap();
+        ObjectFile::from_file(filename)
+    }
+
     #[test]
     fn test_object_file_load() {
-        let object = "LINK\n\
+        let content = "LINK\n\
                       1 1 1\n\
                       .seg 1337dead 4000 RW\n\
                       sym deadbeef 2 RD\n\
                       1 2 3 RD\n";
-        let path = "testfile";
-        let mut output = File::create(path).unwrap();
-        write!(output, "{}", object);
-        let object_file = ObjectFile::from_file(path).unwrap();
-        assert_eq!(format!("{}", object_file), object);
+        let object_file = create_object_file(content, "testfile").unwrap();
+        assert_eq!(format!("{}", object_file), content);
     }
 
     #[test]
     fn test_object_file_wrong_magic() {
-        let object = "LNK\n";
-        let path = "testfile1";
-        let mut output = File::create(path).unwrap();
-        write!(output, "{}", object);
-        let object_file = ObjectFile::from_file(path);
+        let content = "LNK\n";
+        let object_file = create_object_file(content, "testfile1");
         assert_eq!(object_file, Err(LoadError::from("Invalid Magic, expected: 'LINK'")))
     }
 }
