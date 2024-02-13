@@ -1,5 +1,6 @@
 use std::fmt;
 
+#[derive(Debug, PartialEq)]
 pub struct Relocation {
     loc: u64,
     seg_id: u64,

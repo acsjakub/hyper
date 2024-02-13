@@ -6,6 +6,20 @@ use crate::relocation::Relocation;
 use crate::segment::Segment;
 use crate::symbol::Symbol;
 
+#[derive(Debug, PartialEq)]
+struct LoadError {
+    msg: String
+}
+
+impl LoadError {
+    fn from(msg: &str) -> Self {
+        Self {
+            msg: String::from(msg)
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 struct ObjectFile {
     segments: Vec<Segment>,
     symbols: Vec<Symbol>,
@@ -15,14 +29,14 @@ struct ObjectFile {
 
 impl ObjectFile {
     // todo: make this return Result with correct type
-    fn from_file(input_path: &str) -> Self {
+    fn from_file(input_path: &str) -> Result<Self, LoadError> {
         let file = File::open(input_path).unwrap();
         let mut reader = BufReader::new(file);
 
         let mut line = String::new();
         reader.read_line(&mut line).unwrap();
         if line.trim() != "LINK" {
-            panic!("Invalid Magic, expected: 'LINK'")
+            return Err(LoadError::from("Invalid Magic, expected: 'LINK'"));
         }
         line = String::new();
         reader.read_line(&mut line).unwrap();
@@ -33,7 +47,7 @@ impl ObjectFile {
             .collect::<Result<Vec<u64>, _>>()
             .unwrap();
         if nums.len() != 3 {
-            panic!("Expected three numbers on line 2")
+            return Err(LoadError::from("Expected three numbers on line 2"));
         }
         let mut segments = Vec::new();
         let mut symbols = Vec::new();
@@ -58,12 +72,12 @@ impl ObjectFile {
             rels.push(Relocation::from_line(line));
         }
 
-        Self {
+        Ok(Self {
             segments: segments,
             symbols: symbols,
             rels: rels,
             data: Vec::new(),
-        }
+        })
     }
 }
 
@@ -105,7 +119,17 @@ mod tests {
         let path = "testfile";
         let mut output = File::create(path).unwrap();
         write!(output, "{}", object);
-        let object_file = ObjectFile::from_file(path);
+        let object_file = ObjectFile::from_file(path).unwrap();
         assert_eq!(format!("{}", object_file), object);
+    }
+
+    #[test]
+    fn test_object_file_wrong_magic() {
+        let object = "LNK\n";
+        let path = "testfile1";
+        let mut output = File::create(path).unwrap();
+        write!(output, "{}", object);
+        let object_file = ObjectFile::from_file(path);
+        assert_eq!(object_file, Err(LoadError::from("Invalid Magic, expected: 'LINK'")))
     }
 }
