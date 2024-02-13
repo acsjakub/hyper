@@ -132,4 +132,12 @@ mod tests {
         let object_file = create_object_file(content, "testfile1");
         assert_eq!(object_file, Err(LoadError::from("Invalid Magic, expected: 'LINK'")))
     }
+
+    #[test]
+    fn test_object_file_too_few_counts() {
+        let content = "LINK\n\
+                       1 1\n";
+        let object_file = create_object_file(content, "testfile2");
+        assert_eq!(object_file, Err(LoadError::from("Expected three numbers on line 2")))
+    }
 }
