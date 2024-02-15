@@ -1,6 +1,7 @@
 use std::fmt;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use std::collections::HashMap;
 
 use crate::relocation::Relocation;
 use crate::segment::Segment;
@@ -20,6 +21,10 @@ impl LoadError {
 }
 
 #[derive(Debug, PartialEq)]
+struct LinkError;
+
+
+#[derive(Debug, PartialEq)]
 struct ObjectFile {
     segments: Vec<Segment>,
     symbols: Vec<Symbol>,
@@ -28,7 +33,6 @@ struct ObjectFile {
 }
 
 impl ObjectFile {
-    // todo: make this return Result with correct type
     fn from_file(input_path: &str) -> Result<Self, LoadError> {
         let file = File::open(input_path).unwrap();
         let mut reader = BufReader::new(file);
@@ -79,6 +83,24 @@ impl ObjectFile {
             data: Vec::new(),
         })
     }
+
+    fn link(obj_files: Vec<ObjectFile>) {//Result<ObjectFile, LinkError> {
+        let result: Self;
+        let mut segments: Vec<Segment> = Vec::new();
+        let mut seg_total_sizes: HashMap<String, usize> = HashMap::new();
+        for file in obj_files {
+            for segment in file.segments {
+                *seg_total_sizes.entry(segment.name).or_insert(0) += segment.len;
+            }
+        }
+        println!("{:?}", seg_total_sizes);
+        // for each segment found in obj_files' segments, let's check if there already is a segment with
+        // such name,if yes, then we want to append to that segment
+        // but this would mean we have to shift segments, we can also just remember the starting offsets
+        // or we can sort the segments in the vector and in second pass merge the neighbours with same name
+        //
+        // for  now, we'll ignore the flags and address of the segment, just merge it
+    }
 }
 
 impl fmt::Display for ObjectFile {
@@ -92,7 +114,7 @@ impl fmt::Display for ObjectFile {
             self.rels.len()
         )?;
         for segment in &self.segments {
-            write!(f, "{}", segment)?;
+            writeln!(f, "{}", segment)?;
         }
         for symbol in &self.symbols {
             write!(f, "{}", symbol)?;
@@ -139,5 +161,20 @@ mod tests {
                        1 1\n";
         let object_file = create_object_file(content, "testfile2");
         assert_eq!(object_file, Err(LoadError::from("Expected three numbers on line 2")))
+    }
+
+    #[test]
+    fn test_two_obj_files_linkage() {
+        let content = "LINK\n\
+                       3 0 0\n\
+                       .text 1000 2000 R\n\
+                       .data 3000 1000 RW\n\
+                       .bss  4000 200 RW\n";
+        let objfile1 = create_object_file(content, "objfile1").unwrap();
+        let objfile2 = create_object_file(content, "objfile2").unwrap();
+        let linkable = vec![objfile1, objfile2];
+        let result = ObjectFile::link(linkable);
+
+
     }
 }

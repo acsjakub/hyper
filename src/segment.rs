@@ -3,19 +3,23 @@ use std::num::ParseIntError;
 
 #[derive(Debug, PartialEq)]
 pub struct Segment {
-    id: u64,
-    name: String,
-    address: u64,
-    len: usize,
-    flags: String,
+    pub id: u64,
+    pub name: String,
+    pub address: u64,
+    pub len: usize,
+    pub flags: String,
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ParseError;
+pub struct ParseError {
+    msg: String
+}
 
 impl ParseError {
     pub fn from_parseint(err: ParseIntError) -> Self {
-        Self
+        Self {
+            msg: String::from("Could not parse int")
+        }
     }
 }
 
@@ -26,7 +30,7 @@ impl Segment {
     }
 
     pub fn from_line(line: String, id: u64) -> Result<Self, ParseError> {
-        let fields: Vec<&str> = line.split(' ').collect();
+        let fields: Vec<&str> = line.split_whitespace().collect();
         match fields.len() {
             4.. =>  Ok(Self {
                         id: id,
@@ -35,7 +39,7 @@ impl Segment {
                         len: fields[2].parse::<u64>().map_err(ParseError::from_parseint)? as usize,
                         flags: String::from(fields[3]),
             }),
-            _ => Err(ParseError)
+            _ => Err(ParseError { msg: String::from("did not match fields") })
         }
 
     }
@@ -84,6 +88,6 @@ mod test {
     fn test_invalid_address_line() {
         let segment_line = String::from(".seg g14325 4000 RD");
         let segment = Segment::from_line(segment_line, 1);
-        assert_eq!(segment, Err(ParseError));
+        assert_eq!(segment, Err(ParseError { msg: String::from("Could not parse int") }));
     }
 }
