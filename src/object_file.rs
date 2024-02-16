@@ -26,7 +26,7 @@ struct LinkError;
 
 #[derive(Debug, PartialEq)]
 struct ObjectFile {
-    segments: Vec<Segment>,
+    segments: HashMap<String, Segment>,
     symbols: Vec<Symbol>,
     rels: Vec<Relocation>,
     data: Vec<u8>,
@@ -53,7 +53,7 @@ impl ObjectFile {
         if nums.len() != 3 {
             return Err(LoadError::from("Expected three numbers on line 2"));
         }
-        let mut segments = Vec::new();
+        let mut segments = HashMap::new();
         let mut symbols = Vec::new();
         let mut rels = Vec::new();
 
@@ -61,7 +61,8 @@ impl ObjectFile {
         for i in 0..nums[0] {
             line = String::new();
             reader.read_line(&mut line).unwrap();
-            segments.push(Segment::from_line(line, i).unwrap());
+            let segment = Segment::from_line(line, i).unwrap();
+            segments.insert(segment.name.clone(), segment);
         }
 
         for i in 0..nums[1] {
@@ -90,10 +91,12 @@ impl ObjectFile {
         let mut seg_total_sizes: HashMap<String, usize> = HashMap::new();
         for file in obj_files {
             for segment in file.segments {
-                *seg_total_sizes.entry(segment.name).or_insert(0) += segment.len;
+                *seg_total_sizes.entry(segment.1.name).or_insert(0) += segment.1.len;
             }
         }
         println!("{:?}", seg_total_sizes);
+        // think about this, maybe it makes much more sense for the segments to be stored in a
+        // hashmap, keyed with the name, rather than vector
         // for each segment found in obj_files' segments, let's check if there already is a segment with
         // such name,if yes, then we want to append to that segment
         // but this would mean we have to shift segments, we can also just remember the starting offsets
@@ -114,7 +117,7 @@ impl fmt::Display for ObjectFile {
             self.rels.len()
         )?;
         for segment in &self.segments {
-            writeln!(f, "{}", segment)?;
+            writeln!(f, "{}", segment.1)?;
         }
         for symbol in &self.symbols {
             write!(f, "{}", symbol)?;
