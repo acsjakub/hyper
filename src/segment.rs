@@ -16,7 +16,7 @@ pub struct ParseError {
 }
 
 impl ParseError {
-    pub fn from_parseint(err: ParseIntError) -> Self {
+    pub fn from_parseint(_err: ParseIntError) -> Self {
         Self {
             msg: String::from("Could not parse int"),
         }
@@ -82,7 +82,7 @@ mod test {
     #[test]
     fn test_short_line() {
         let segment_line = String::from(".seg 14325 4000");
-        let segment = Segment::from_line(segment_line, 1);
+        let _ = Segment::from_line(segment_line, 1);
     }
 
     #[test]
