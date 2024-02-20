@@ -1,7 +1,7 @@
+use std::collections::HashMap;
 use std::fmt;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::collections::HashMap;
 
 use crate::relocation::Relocation;
 use crate::segment::Segment;
@@ -9,20 +9,19 @@ use crate::symbol::Symbol;
 
 #[derive(Debug, PartialEq)]
 struct LoadError {
-    msg: String
+    msg: String,
 }
 
 impl LoadError {
     fn from(msg: &str) -> Self {
         Self {
-            msg: String::from(msg)
+            msg: String::from(msg),
         }
     }
 }
 
 #[derive(Debug, PartialEq)]
 struct LinkError;
-
 
 #[derive(Debug, PartialEq)]
 struct ObjectFile {
@@ -85,24 +84,39 @@ impl ObjectFile {
         })
     }
 
-    fn link(obj_files: Vec<ObjectFile>) {//Result<ObjectFile, LinkError> {
-        let result: Self;
-        let mut segments: Vec<Segment> = Vec::new();
-        let mut seg_total_sizes: HashMap<String, usize> = HashMap::new();
-        for file in obj_files {
-            for segment in file.segments {
-                *seg_total_sizes.entry(segment.1.name).or_insert(0) += segment.1.len;
+    fn link(obj_files: Vec<ObjectFile>) -> Result<ObjectFile, LinkError> {
+        let mut result_segments = HashMap::new();
+        let mut segs_grouped_by_name: HashMap<String, Vec<&Segment>> = HashMap::new();
+
+        for file in &obj_files {
+            for (_, segment) in &file.segments {
+                segs_grouped_by_name
+                    .entry(segment.name.clone())
+                    .or_insert(Vec::new())
+                    .push(segment);
             }
         }
-        println!("{:?}", seg_total_sizes);
-        // think about this, maybe it makes much more sense for the segments to be stored in a
-        // hashmap, keyed with the name, rather than vector
-        // for each segment found in obj_files' segments, let's check if there already is a segment with
-        // such name,if yes, then we want to append to that segment
-        // but this would mean we have to shift segments, we can also just remember the starting offsets
-        // or we can sort the segments in the vector and in second pass merge the neighbours with same name
-        //
-        // for  now, we'll ignore the flags and address of the segment, just merge it
+        let mut next_free_address: u64 = 0x1000;
+        let mut next_free_id: u64 = 1;
+
+        for (name, segments) in segs_grouped_by_name {
+            let seg = Segment {
+                id: next_free_id,
+                name: name.clone(),
+                address: next_free_address,
+                len: segments.iter().map(|s| s.len).sum(),
+                flags: String::from(&segments[0].flags), //this assumes segments with the same name have same name
+            };
+            next_free_address += seg.len as u64 + (0x1000 - (seg.len as u64 % 0x1000));
+            result_segments.insert(name, seg);
+            next_free_id += 1;
+        }
+        Ok(Self {
+            segments: result_segments,
+            symbols: Vec::new(),
+            rels: Vec::new(),
+            data: Vec::new(),
+        })
     }
 }
 
@@ -155,7 +169,10 @@ mod tests {
     fn test_object_file_wrong_magic() {
         let content = "LNK\n";
         let object_file = create_object_file(content, "testfile1");
-        assert_eq!(object_file, Err(LoadError::from("Invalid Magic, expected: 'LINK'")))
+        assert_eq!(
+            object_file,
+            Err(LoadError::from("Invalid Magic, expected: 'LINK'"))
+        )
     }
 
     #[test]
@@ -163,7 +180,10 @@ mod tests {
         let content = "LINK\n\
                        1 1\n";
         let object_file = create_object_file(content, "testfile2");
-        assert_eq!(object_file, Err(LoadError::from("Expected three numbers on line 2")))
+        assert_eq!(
+            object_file,
+            Err(LoadError::from("Expected three numbers on line 2"))
+        )
     }
 
     #[test]
@@ -176,8 +196,28 @@ mod tests {
         let objfile1 = create_object_file(content, "objfile1").unwrap();
         let objfile2 = create_object_file(content, "objfile2").unwrap();
         let linkable = vec![objfile1, objfile2];
-        let result = ObjectFile::link(linkable);
+        ObjectFile::link(linkable).unwrap();
+    }
 
+    #[test]
+    fn test_basic_segment_allocation() {
+        let content = "LINK\n\
+                       3 0 0\n\
+                       .text 1000 2000 R\n\
+                       .data 3000 1000 RW\n\
+                       .bss  4000 200 RW\n";
+        let objfile1 = create_object_file(content, "objfile1").unwrap();
+        let content = "LINK\n\
+                       3 0 0\n\
+                       .text 1000 6000 R\n\
+                       .data 3000 500 RW\n\
+                       .bss  4000 2000 RW\n";
 
+        let objfile2 = create_object_file(content, "objfile2").unwrap();
+        let linkable = vec![objfile1, objfile2];
+        let result = ObjectFile::link(linkable).unwrap();
+        assert_eq!(result.segments[".bss"].len, 2200);
+        assert_eq!(result.segments[".data"].len, 1500);
+        assert_eq!(result.segments[".text"].len, 8000);
     }
 }
