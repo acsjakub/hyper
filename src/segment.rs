@@ -12,19 +12,18 @@ pub struct Segment {
 
 #[derive(Debug, PartialEq)]
 pub struct ParseError {
-    msg: String
+    msg: String,
 }
 
 impl ParseError {
     pub fn from_parseint(err: ParseIntError) -> Self {
         Self {
-            msg: String::from("Could not parse int")
+            msg: String::from("Could not parse int"),
         }
     }
 }
 
 impl Segment {
-
     fn address_from_str(addr: &str) -> Result<u64, ParseError> {
         Ok(u64::from_str_radix(addr, 16).map_err(ParseError::from_parseint)?)
     }
@@ -32,16 +31,19 @@ impl Segment {
     pub fn from_line(line: String, id: u64) -> Result<Self, ParseError> {
         let fields: Vec<&str> = line.split_whitespace().collect();
         match fields.len() {
-            4.. =>  Ok(Self {
-                        id: id,
-                        name: String::from(fields[0]),
-                        address: Self::address_from_str(fields[1])?,
-                        len: fields[2].parse::<u64>().map_err(ParseError::from_parseint)? as usize,
-                        flags: String::from(fields[3]),
+            4.. => Ok(Self {
+                id: id,
+                name: String::from(fields[0]),
+                address: Self::address_from_str(fields[1])?,
+                len: fields[2]
+                    .parse::<u64>()
+                    .map_err(ParseError::from_parseint)? as usize,
+                flags: String::from(fields[3]),
             }),
-            _ => Err(ParseError { msg: String::from("did not match fields") })
+            _ => Err(ParseError {
+                msg: String::from("did not match fields"),
+            }),
         }
-
     }
 }
 
@@ -77,7 +79,6 @@ mod test {
         assert_eq!(segment.flags, "RW");
     }
 
-
     #[test]
     fn test_short_line() {
         let segment_line = String::from(".seg 14325 4000");
@@ -88,6 +89,11 @@ mod test {
     fn test_invalid_address_line() {
         let segment_line = String::from(".seg g14325 4000 RD");
         let segment = Segment::from_line(segment_line, 1);
-        assert_eq!(segment, Err(ParseError { msg: String::from("Could not parse int") }));
+        assert_eq!(
+            segment,
+            Err(ParseError {
+                msg: String::from("Could not parse int")
+            })
+        );
     }
 }
