@@ -111,6 +111,29 @@ impl ObjectFile {
             result_segments.insert(name, seg);
             next_free_id += 1;
         }
+
+        // for exercise 4.2
+        // adding common blocks
+        // go through symbol table and identify non-zero undefined symbols
+        // (they have 0 as a segment number and U as a type)
+        // add space of appropriate size to the .bss segment
+
+        let mut common_block_size = 0;
+        for file in &obj_files {
+            for symbol in &file.symbols {
+                if (symbol.typ == String::from("U") && symbol.value > common_block_size) {
+                    common_block_size = symbol.value;
+                }
+            }
+        }
+        result_segments.entry(".bss".into()).or_insert(Segment {
+            id: next_free_id,
+            name: String::from(".bss"),
+            address: next_free_address,
+            len: 0,
+            flags: String::from("RW"),
+
+        }).len += common_block_size as usize;
         Ok(Self {
             segments: result_segments,
             symbols: Vec::new(),
@@ -219,5 +242,31 @@ mod tests {
         assert_eq!(result.segments[".bss"].len, 2200);
         assert_eq!(result.segments[".data"].len, 1500);
         assert_eq!(result.segments[".text"].len, 8000);
+    }
+
+    #[test]
+    fn test_common_segment_allocation() {
+        let content = "LINK\n\
+                       2 3 0\n\
+                       .text 1000 4000 R\n\
+                       .data 5000 1000 RW\n\
+                       symbol_undef 300 0 U\n\
+                       symbol_def cafebabe 1 D\n\
+                       symbol_zero 0 0 U\n";
+        let objfile1 = create_object_file(content, "/tmp/test_objfile1").unwrap();
+        let content = "LINK\n\
+                       3 2 0\n\
+                       .text 1000 5000 R\n\
+                       .data 6000 2000 RW\n\
+                       .bss  8000 200  RW\n\
+                       symbol_next_undef 100 0 U\n\
+                       symbol_known 1442dead 1 D\n";
+        let  objfile2 = create_object_file(content, "/tmp/test_objfile2").unwrap();
+        let linkable = vec![objfile1, objfile2];
+        let result = ObjectFile::link(linkable).unwrap();
+        assert_eq!(result.segments[".bss"].len, 200 + 0x300);
+
+
+
     }
 }
