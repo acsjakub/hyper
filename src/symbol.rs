@@ -1,23 +1,47 @@
 use std::fmt;
+use std::num::ParseIntError;
 
 #[derive(Debug, PartialEq)]
 pub struct Symbol {
     id: u64,
     name: String,
-    value: u64,
+    pub value: u64,
     seg_id: u64,
-    typ: String,
+    pub typ: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ParseError {
+    msg: String,
+}
+
+impl ParseError {
+    pub fn from_parseint(_err: ParseIntError) -> Self {
+        Self {
+            msg: String::from("Could not parse int"),
+        }
+    }
 }
 
 impl Symbol {
+    fn address_from_str(addr: &str) -> Result<u64, ParseError> {
+        Ok(u64::from_str_radix(addr, 16).map_err(ParseError::from_parseint)?)
+    }
+
     pub fn from_line(line: String, id: u64) -> Self {
         let mut it = line.split(' ');
-        Self {
-            id: id,
-            name: it.next().unwrap().into(),
-            value: u64::from_str_radix(it.next().unwrap(), 16).unwrap(),
-            seg_id: it.next().unwrap().parse::<u64>().unwrap(),
-            typ: it.next().unwrap().into(),
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        match fields.len() {
+            4.. => {
+                Self {
+                    id: id,
+                    name: fields[0].into(),
+                    value: Self::address_from_str(fields[1].into()).unwrap(),
+                    seg_id: fields[2].parse::<u64>().unwrap(),
+                    typ: fields[3].into(),
+                }
+            },
+            _ => panic!("wrong numbeer of fields for symbol record")
         }
     }
 }

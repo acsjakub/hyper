@@ -134,7 +134,7 @@ impl fmt::Display for ObjectFile {
             writeln!(f, "{}", segment.1)?;
         }
         for symbol in &self.symbols {
-            write!(f, "{}", symbol)?;
+            writeln!(f, "{}", symbol)?;
         }
         for rel in &self.rels {
             write!(f, "{}", rel)?;
