@@ -1,5 +1,5 @@
 use std::fmt;
-use std::num::ParseIntError;
+use crate::error::ParseError;
 
 #[derive(Debug, PartialEq)]
 pub struct Symbol {
@@ -8,19 +8,6 @@ pub struct Symbol {
     pub value: u64,
     seg_id: u64,
     pub typ: String,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct ParseError {
-    msg: String,
-}
-
-impl ParseError {
-    pub fn from_parseint(_err: ParseIntError) -> Self {
-        Self {
-            msg: String::from("Could not parse int"),
-        }
-    }
 }
 
 impl Symbol {

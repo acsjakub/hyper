@@ -1,5 +1,5 @@
 use std::fmt;
-use std::num::ParseIntError;
+use crate::error::ParseError;
 
 #[derive(Debug, PartialEq)]
 pub struct Segment {
@@ -8,19 +8,6 @@ pub struct Segment {
     pub address: u64,
     pub len: usize,
     pub flags: String,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct ParseError {
-    msg: String,
-}
-
-impl ParseError {
-    pub fn from_parseint(_err: ParseIntError) -> Self {
-        Self {
-            msg: String::from("Could not parse int"),
-        }
-    }
 }
 
 impl Segment {
@@ -40,9 +27,7 @@ impl Segment {
                     .map_err(ParseError::from_parseint)? as usize,
                 flags: String::from(fields[3]),
             }),
-            _ => Err(ParseError {
-                msg: String::from("did not match fields"),
-            }),
+            _ => Err(ParseError::from("did not match fields")),
         }
     }
 }
@@ -91,9 +76,7 @@ mod test {
         let segment = Segment::from_line(segment_line, 1);
         assert_eq!(
             segment,
-            Err(ParseError {
-                msg: String::from("Could not parse int")
-            })
+            Err(ParseError::from("Could not parse int")),
         );
     }
 }
