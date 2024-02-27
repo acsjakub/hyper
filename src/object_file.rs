@@ -67,7 +67,7 @@ impl ObjectFile {
         for i in 0..nums[1] {
             line = String::new();
             reader.read_line(&mut line).unwrap();
-            symbols.push(Symbol::from_line(line, i));
+            symbols.push(Symbol::from_line(line, i).unwrap());
         }
 
         for _ in 0..nums[2] {

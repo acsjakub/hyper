@@ -15,20 +15,19 @@ impl Symbol {
         Ok(u64::from_str_radix(addr, 16).map_err(ParseError::from_parseint)?)
     }
 
-    pub fn from_line(line: String, id: u64) -> Self {
-        let mut it = line.split(' ');
+    pub fn from_line(line: String, id: u64) -> Result<Self, ParseError> {
         let fields: Vec<&str> = line.split_whitespace().collect();
         match fields.len() {
             4.. => {
-                Self {
+                Ok(Self {
                     id: id,
                     name: fields[0].into(),
                     value: Self::address_from_str(fields[1].into()).unwrap(),
                     seg_id: fields[2].parse::<u64>().unwrap(),
                     typ: fields[3].into(),
-                }
+                })
             },
-            _ => panic!("wrong numbeer of fields for symbol record")
+            _ => Err(ParseError::from("wrong numbeer of fields for symbol record"))
         }
     }
 }
@@ -50,7 +49,7 @@ mod test {
     #[test]
     fn test_symbol_from_line() {
         let symbol_line = String::from("name deadbeef 2 RD");
-        let symbol = Symbol::from_line(symbol_line, 1);
+        let symbol = Symbol::from_line(symbol_line, 1).unwrap();
         assert_eq!(symbol.id, 1);
         assert_eq!(symbol.name, "name");
         assert_eq!(symbol.value, 0xdeadbeef);
@@ -61,7 +60,7 @@ mod test {
     #[test]
     fn test_symbol_display() {
         let symbol_line = String::from("name deadbeef 2 RD");
-        let symbol = Symbol::from_line(symbol_line.clone(), 1);
+        let symbol = Symbol::from_line(symbol_line.clone(), 1).unwrap();
         assert_eq!(format!("{}", symbol), symbol_line);
     }
 }
