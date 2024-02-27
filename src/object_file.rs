@@ -6,22 +6,7 @@ use std::io::{BufRead, BufReader};
 use crate::relocation::Relocation;
 use crate::segment::Segment;
 use crate::symbol::Symbol;
-
-#[derive(Debug, PartialEq)]
-struct LoadError {
-    msg: String,
-}
-
-impl LoadError {
-    fn from(msg: &str) -> Self {
-        Self {
-            msg: String::from(msg),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-struct LinkError;
+use crate::error::{LoadError, LinkError};
 
 #[derive(Debug, PartialEq)]
 struct ObjectFile {
@@ -121,7 +106,7 @@ impl ObjectFile {
         let mut common_block_size = 0;
         for file in &obj_files {
             for symbol in &file.symbols {
-                if (symbol.typ == String::from("U") && symbol.value > common_block_size) {
+                if symbol.typ == String::from("U") && symbol.value > common_block_size {
                     common_block_size = symbol.value;
                 }
             }

@@ -1,15 +1,15 @@
 use std::num::ParseIntError;
 
 #[derive(Debug, PartialEq)]
-struct LinkError;
+pub struct LinkError;
 
 #[derive(Debug, PartialEq)]
-struct LoadError {
+pub struct LoadError {
     msg: String,
 }
 
 impl LoadError {
-    fn from(msg: &str) -> Self {
+    pub fn from(msg: &str) -> Self {
         Self {
             msg: String::from(msg),
         }
