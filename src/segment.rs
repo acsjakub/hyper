@@ -1,5 +1,5 @@
-use std::fmt;
 use crate::error::ParseError;
+use std::fmt;
 
 #[derive(Debug, PartialEq)]
 pub struct Segment {
@@ -13,6 +13,15 @@ pub struct Segment {
 impl Segment {
     fn address_from_str(addr: &str) -> Result<u64, ParseError> {
         Ok(u64::from_str_radix(addr, 16).map_err(ParseError::from_parseint)?)
+    }
+    pub fn from(id: u64, name: &str, address: u64, len: usize, flags: &str) -> Self {
+        Self {
+            id,
+            name: name.to_string(),
+            address,
+            len,
+            flags: flags.to_string(),
+        }
     }
 
     pub fn from_line(line: String, id: u64) -> Result<Self, ParseError> {
@@ -74,9 +83,6 @@ mod test {
     fn test_invalid_address_line() {
         let segment_line = String::from(".seg g14325 4000 RD");
         let segment = Segment::from_line(segment_line, 1);
-        assert_eq!(
-            segment,
-            Err(ParseError::from("Could not parse int")),
-        );
+        assert_eq!(segment, Err(ParseError::from("Could not parse int")),);
     }
 }

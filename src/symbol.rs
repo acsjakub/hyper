@@ -1,5 +1,5 @@
-use std::fmt;
 use crate::error::ParseError;
+use std::fmt;
 
 #[derive(Debug, PartialEq)]
 pub struct Symbol {
@@ -18,16 +18,16 @@ impl Symbol {
     pub fn from_line(line: String, id: u64) -> Result<Self, ParseError> {
         let fields: Vec<&str> = line.split_whitespace().collect();
         match fields.len() {
-            4.. => {
-                Ok(Self {
-                    id: id,
-                    name: fields[0].into(),
-                    value: Self::address_from_str(fields[1].into()).unwrap(),
-                    seg_id: fields[2].parse::<u64>().unwrap(),
-                    typ: fields[3].into(),
-                })
-            },
-            _ => Err(ParseError::from("wrong numbeer of fields for symbol record"))
+            4.. => Ok(Self {
+                id: id,
+                name: fields[0].into(),
+                value: Self::address_from_str(fields[1].into()).unwrap(),
+                seg_id: fields[2].parse::<u64>().unwrap(),
+                typ: fields[3].into(),
+            }),
+            _ => Err(ParseError::from(
+                "wrong numbeer of fields for symbol record",
+            )),
         }
     }
 }
