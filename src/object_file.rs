@@ -3,10 +3,10 @@ use std::fmt;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
+use crate::error::{LinkError, LoadError};
 use crate::relocation::Relocation;
 use crate::segment::Segment;
 use crate::symbol::Symbol;
-use crate::error::{LoadError, LinkError};
 
 #[derive(Debug, PartialEq)]
 struct ObjectFile {
@@ -14,9 +14,13 @@ struct ObjectFile {
     symbols: Vec<Symbol>,
     rels: Vec<Relocation>,
     data: Vec<u8>,
+    rt_seg_alloc_map: HashMap<u64, u64>,
 }
 
 impl ObjectFile {
+    const STARTING_ADDRESS: u64 = 0x1000;
+    const SEGMENT_ALIGNMENT: u64 = 0x1000;
+
     fn from_file(input_path: &str) -> Result<Self, LoadError> {
         let file = File::open(input_path).unwrap();
         let mut reader = BufReader::new(file);
@@ -66,64 +70,112 @@ impl ObjectFile {
             symbols: symbols,
             rels: rels,
             data: Vec::new(),
+            rt_seg_alloc_map: HashMap::new(),
         })
     }
 
-    fn link(obj_files: Vec<ObjectFile>) -> Result<ObjectFile, LinkError> {
+    fn merge_segments(obj_files: &mut Vec<ObjectFile>, seg_sizes: &HashMap<String, usize>) -> HashMap<String, Segment> {
         let mut result_segments = HashMap::new();
-        let mut segs_grouped_by_name: HashMap<String, Vec<&Segment>> = HashMap::new();
-
-        for file in &obj_files {
-            for (_, segment) in &file.segments {
-                segs_grouped_by_name
-                    .entry(segment.name.clone())
-                    .or_insert(Vec::new())
-                    .push(segment);
-            }
-        }
-        let mut next_free_address: u64 = 0x1000;
+        let mut next_segment_address: u64 = Self::STARTING_ADDRESS;
         let mut next_free_id: u64 = 1;
 
-        for (name, segments) in segs_grouped_by_name {
-            let seg = Segment {
-                id: next_free_id,
-                name: name.clone(),
-                address: next_free_address,
-                len: segments.iter().map(|s| s.len).sum(),
-                flags: String::from(&segments[0].flags), //this assumes segments with the same name have same name
-            };
-            next_free_address += seg.len as u64 + (0x1000 - (seg.len as u64 % 0x1000));
-            result_segments.insert(name, seg);
-            next_free_id += 1;
+        // create segments for the resulting file by
+        // merging segments from input files with the same name
+
+        for file in obj_files {
+            for (name, segment) in &file.segments {
+                let r_segment: &mut Segment = match result_segments.get_mut(name) {
+                    Some(segment) => segment,
+                    None => {
+                        result_segments.insert(
+                            name.into(),
+                            Segment::from(
+                                next_free_id,
+                                name,
+                                next_segment_address,
+                                0,
+                                &segment.flags,
+                            ),
+                        );
+                        let seg_len = *seg_sizes.get(name.into()).unwrap() as u64;
+                        next_segment_address =
+                            seg_len + (Self::SEGMENT_ALIGNMENT - (seg_len % Self::SEGMENT_ALIGNMENT));
+                        next_free_id += 1;
+                        result_segments.get_mut(name).unwrap()
+                    }
+                };
+                file.rt_seg_alloc_map
+                    .insert(segment.id, r_segment.address + r_segment.len as u64);
+                r_segment.len += segment.len;
+            }
         }
+        result_segments
+    }
+
+    fn add_common_block(obj_files: &Vec<ObjectFile>, result_segments: &mut HashMap<String, Segment>) {
 
         // for exercise 4.2
         // adding common blocks
         // go through symbol table and identify non-zero undefined symbols
         // (they have 0 as a segment number and U as a type)
         // add space of appropriate size to the .bss segment
+        //
+        //
 
         let mut common_block_size = 0;
-        for file in &obj_files {
+        for file in obj_files {
             for symbol in &file.symbols {
                 if symbol.typ == String::from("U") && symbol.value > common_block_size {
                     common_block_size = symbol.value;
                 }
             }
         }
-        result_segments.entry(".bss".into()).or_insert(Segment {
-            id: next_free_id,
-            name: String::from(".bss"),
-            address: next_free_address,
-            len: 0,
-            flags: String::from("RW"),
 
-        }).len += common_block_size as usize;
+        let total_len = result_segments.iter().map(|(_,s)| s.len).sum::<usize>() as u64;
+        let next_id = result_segments.len() as u64 + 1;
+        result_segments
+            .entry(".bss".into())
+            .or_insert(Segment {
+                id: next_id,
+                name: String::from(".bss"),
+                address: total_len,
+                len: 0,
+                flags: String::from("RW"),
+            })
+            .len += common_block_size as usize;
+    }
+
+    // creates new segment allocation map and stores
+    // information about new locations for each segment
+    // in the rt_seg_alloc_map structure of each respective file
+    fn allocate_segments(
+        obj_files: &mut Vec<ObjectFile>,
+    ) -> Result<HashMap<String, Segment>, LinkError> {
+        let mut seg_sizes = HashMap::new();
+
+        for file in obj_files.iter() {
+            for (_, segment) in &file.segments {
+                *seg_sizes.entry(segment.name.clone()).or_insert(0) += segment.len
+            }
+        }
+        println!("{:?}", seg_sizes);
+
+        let mut result_segments = Self::merge_segments(obj_files, &seg_sizes);
+        Self::add_common_block(obj_files, &mut result_segments);
+
+        Ok(result_segments)
+    }
+
+    fn link(obj_files: Vec<ObjectFile>) -> Result<ObjectFile, LinkError> {
+        let mut objects = obj_files;
+        // create global symbol table
+        // what needs to be in the per object symbol table?
         Ok(Self {
-            segments: result_segments,
+            segments: Self::allocate_segments(&mut objects)?,
             symbols: Vec::new(),
             rels: Vec::new(),
             data: Vec::new(),
+            rt_seg_alloc_map: HashMap::new(),
         })
     }
 }
@@ -246,12 +298,9 @@ mod tests {
                        .bss  8000 200  RW\n\
                        symbol_next_undef 100 0 U\n\
                        symbol_known 1442dead 1 D\n";
-        let  objfile2 = create_object_file(content, "/tmp/test_objfile2").unwrap();
+        let objfile2 = create_object_file(content, "/tmp/test_objfile2").unwrap();
         let linkable = vec![objfile1, objfile2];
         let result = ObjectFile::link(linkable).unwrap();
         assert_eq!(result.segments[".bss"].len, 200 + 0x300);
-
-
-
     }
 }
